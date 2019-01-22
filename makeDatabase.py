@@ -22,77 +22,73 @@ def createDatabaseConnection(filename, forcedOverride=False):
     try:
         conn = sqlite3.connect(filename)
         return conn
-    except sqlite3.Error as e:
+    except sqlite3.Error:
         print("ERROR: Creating Connection")
 
         return None
-
-# Driver function to load data into tables
-
-
-def loadJSONDataIntoTables(databaseConnection, allSetJSONDictionary):
-    insertIntoSetsTable(databaseConnection, allSetJSONDictionary)
+# General query function
 
 
-# Insert data into Sets Table
-def insertIntoSetsTable(databaseConnection, allSetJSONDictionary):
-    cursor = databaseConnection.cursor()
+def insertIntoTableBulk(databaseConnection, tableColumnsSet, tableRowsSetList, tableName):
     try:
+        insertStatement = "Insert into "+tableName+"(\"" + "\",\"".join(
+            tableColumnsSet) + "\") values(\"" + ",".join(["?"]*tableColumnsSet.length)+"\");"
 
-        # Begin inserting table.
-
-        for setInfo in allSetJSONDictionary.values():
-            # insert into set table
-
-            insertValues = OrderedDict()
-            # print(setInfo.keys())
-            # Begin deconstructing json dictionary to build insert statement
-            # Includes logic checks for instances where column values can be undefined.
-            insertValues['size'] = setInfo["baseSetSize"]
-            if "block" in setInfo:
-                insertValues["block"] = setInfo['block']
-            else:
-                insertValues["block"] = 'n/a'
-
-            #insertValues["BoosterScheme"] = str(setInfo["boosterV3"])
-            insertValues["code"] = setInfo["code"]
-            if "isOnlineOnly" in setInfo:
-                insertValues["isOnlineOnly"] = setInfo["isOnlineOnly"]
-            else:
-                insertValues["isOnlineOnly"] = "n/a"
-            if setInfo["mtgoCode"] is None:
-                insertValues["MTGOCode"] = 'n/a'
-            else:
-                insertValues["MTGOCode"] = setInfo["mtgoCode"]
-
-            insertValues["name"] = setInfo["name"]
-            insertValues["releaseDate"] = setInfo["releaseDate"]
-            insertValues["totalSetSize"] = setInfo["totalSetSize"]
-            insertValues["type"] = setInfo["type"]
-
-            insertStatement = "Insert into tblSets(\"" + "\",\"".join(
-                insertValues.keys()) + "\") values(\"" + "\",\"".join([str(i) for i in insertValues.values()])+"\");"
-
-            # Attempts insert statement
-            cursor.execute(insertStatement)
+        # Attempts insert statement
+        databaseConnection.executemany(insertStatement, tableRowsSetList)
         databaseConnection.commit()
     # Rolls back database changes if errors are encountered
-    except sqlite3.Error as e:
-        print(e)
-        print("ERROR: Insert statements failed. Performing Rollback")
+    except sqlite3.Error:
+        print("ERROR: Insert statements failed for table " +
+              tableName+". Performing Rollback")
         databaseConnection.rollback()
         raise
 
-# Create database tables for sqllite database.
+
+def insertIntoTableSingle(databaseConnection, tableColumnsSet, tableRowSet, tableName):
+    try:
+        insertStatement = "Insert into "+tableName+"(\"" + "\",\"".join(
+            tableColumnsSet) + "\") values(\"" + ",".join(["?"]*tableColumnsSet.length)+"\");"
+
+        # Attempts insert statement
+        databaseConnection.execute(insertStatement, tableRowSet)
+        databaseConnection.commit()
+    # Rolls back database changes if errors are encountered
+    except sqlite3.Error:
+        print("ERROR: Insert statements failed for table " +
+              tableName+". Performing Rollback")
+        databaseConnection.rollback()
+        raise
+# Driver function to load data into tables
+
+
+def loadJSONDataIntoTables(dbConnection, jsonFile):
+    return None
+
+
+def normalizeIrregularValues(rowDictionary, ColumnsSet):
+    for i in ColumnsSet:
+        if i in rowDictionary:
+            if rowDictionary[i] is None:
+                rowDictionary[i] = 'n/a'
+        else:
+            rowDictionary[i] = 'n/a'
+
+
+def insertIntoSetsTable(databaseConnection, JSONDictionary):
+
+    # Iterate through each set
+            # Insert into sets table
+    setsColumnsSet = ("baseSetSize", "block", "code", "isOnlineOnly",
+                      "mtgoCode", "name", "releaseDate", "totalSetSize", "type")
 
 
 def createDatabaseTables(databaseConnection):
-    cursor = databaseConnection.cursor()
 
-# Create table for set information.
+    # Create table for set information.
     try:
 
-        cursor.execute("""CREATE TABLE tblSets(
+        databaseConnection.execute("""CREATE TABLE tblSets(
         Size	INTEGER,
         Block	TEXT,
         BoosterScheme	TEXT,
@@ -108,7 +104,7 @@ def createDatabaseTables(databaseConnection):
 
 # Create table for card information
 
-        cursor.execute("""CREATE TABLE tblCards(
+        databaseConnection.execute("""CREATE TABLE tblCards(
         Artist	TEXT,
         BorderColor	TEXT,
         ConvertedManaCost	REAL,
@@ -149,7 +145,7 @@ def createDatabaseTables(databaseConnection):
 
     # Create table for token information
 
-        cursor.execute("""CREATE TABLE tblTokens(
+        databaseConnection.execute("""CREATE TABLE tblTokens(
             Artist	TEXT,
             BorderColor	TEXT,
             Loyalty	TEXT,
@@ -170,36 +166,36 @@ def createDatabaseTables(databaseConnection):
 
     # Create link tables
 
-        cursor.execute("""CREATE TABLE `tblSetsTokens` (`Code`	TEXT,
+        databaseConnection.execute("""CREATE TABLE `tblSetsTokens` (`Code`	TEXT,
         `MTGJSONID`	TEXT,
         PRIMARY KEY(`Code`, `MTGJSONID`)
     ); """)
 
-        cursor.execute("""CREATE TABLE `tblSetsCards` (`Code`	TEXT,
+        databaseConnection.execute("""CREATE TABLE `tblSetsCards` (`Code`	TEXT,
         `MTGJSONID`	TEXT,
         PRIMARY KEY(`Code`, `MTGJSONID`)
     ); """)
 
     # Minor facet tables
 
-        cursor.execute(
+        databaseConnection.execute(
             """CREATE TABLE tblCardColorIdentity(Color Text, MTGJSONID Text, Primary Key(Color, MTGJSONID)); """)
 
-        cursor.execute(
+        databaseConnection.execute(
             """CREATE TABLE tblCardColors(Color Text, MTGJSONID Text, Primary Key(Color, MTGJSONID)); """)
 
-        cursor.execute(
+        databaseConnection.execute(
             """CREATE TABLE tblLegalFormat(MTGJSONID Text, LegalFormat Text, Primary Key(MTGJSONID, LegalFormat)); """)
 
-        cursor.execute(
+        databaseConnection.execute(
             """CREATE TABLE tblSubTypes(MTGJSONID Text, SubType Text, Primary Key(MTGJSONID, SubType)); """)
 
-        cursor.execute(
+        databaseConnection.execute(
             """CREATE TABLE tblSuperTypes(MTGJSONID Text, SuperType Text, Primary Key(MTGJSONID, SuperType)); """)
 
-        cursor.execute(
+        databaseConnection.execute(
             """CREATE TABLE tblCardType(MTGJSONID Text, CardType Text, Primary Key(MTGJSONID, CardType)); """)
-        cursor.execute(
+        databaseConnection.execute(
             """CREATE TABLE tblCardVariations(MTGJSONID Text, MTGJSONIDVariation Text, Primary Key(MTGJSONID, MTGJSONIDVariation));""")
         print("Table Cursor: Commit Statement")
         databaseConnection.commit()
@@ -230,9 +226,9 @@ def main():
         loadJSONDataIntoTables(dbConnection, jsonFile)
     except:
         print("ERROR: Something Broke. This is the main function.")
-        #exc_type, exc_obj, exc_tb = sys.exc_info()
-        #fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        #print(exc_type, fname, exc_tb.tb_lineno)
+        # exc_type, exc_obj, exc_tb = sys.exc_info()
+        # fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        # print(exc_type, fname, exc_tb.tb_lineno)
         traceback.print_exc()
         exit("General Error")
 

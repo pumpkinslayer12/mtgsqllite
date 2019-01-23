@@ -29,13 +29,13 @@ def createDatabaseConnection(filename, forcedOverride=False):
 # General query function
 
 
-def insertIntoTableBulk(databaseConnection, tableColumnsSet, tableRowsSetList, tableName):
+def insertIntoTableBulk(databaseConnection, columnRowsTuple, tableName):
     try:
         insertStatement = "Insert into "+tableName+"(\"" + "\",\"".join(
-            tableColumnsSet) + "\") values(\"" + ",".join(["?"]*tableColumnsSet.length)+"\");"
+            columnRowsTuple[0]) + "\") values(\"" + ",".join(["?"]*columnRowsTuple[0].length)+"\");"
 
         # Attempts insert statement
-        databaseConnection.executemany(insertStatement, tableRowsSetList)
+        databaseConnection.executemany(insertStatement, columnRowsTuple[1])
         databaseConnection.commit()
     # Rolls back database changes if errors are encountered
     except sqlite3.Error:
@@ -45,13 +45,13 @@ def insertIntoTableBulk(databaseConnection, tableColumnsSet, tableRowsSetList, t
         raise
 
 
-def insertIntoTableSingle(databaseConnection, tableColumnsSet, tableRowSet, tableName):
+def insertIntoTableSingle(databaseConnection, columnRowTuple, tableName):
     try:
         insertStatement = "Insert into "+tableName+"(\"" + "\",\"".join(
-            tableColumnsSet) + "\") values(\"" + ",".join(["?"]*tableColumnsSet.length)+"\");"
+            columnRowTuple[0]) + "\") values(\"" + ",".join(["?"]*columnRowTuple[0].length)+"\");"
 
         # Attempts insert statement
-        databaseConnection.execute(insertStatement, tableRowSet)
+        databaseConnection.execute(insertStatement, columnRowTuple[1])
         databaseConnection.commit()
     # Rolls back database changes if errors are encountered
     except sqlite3.Error:
@@ -62,17 +62,67 @@ def insertIntoTableSingle(databaseConnection, tableColumnsSet, tableRowSet, tabl
 # Driver function to load data into tables
 
 
-def loadJSONDataIntoTables(dbConnection, jsonFile):
-    return None
-
-
-def normalizeIrregularValues(rowDictionary, ColumnsSet):
-    for i in ColumnsSet:
+def normalizeIrregularValues(rowDictionary, columnsList):
+    for i in columnsList:
         if i in rowDictionary:
             if rowDictionary[i] is None:
                 rowDictionary[i] = 'n/a'
         else:
             rowDictionary[i] = 'n/a'
+
+
+def loadJSONDataIntoTables(dbConnection, jsonFile):
+    return None
+
+# returns tuple of table name, sqllite meta structure as dictionary and primary keys as lists
+
+
+def getCardColorIdentityTableStructure():
+    return ("tblCardColorIdentity", {"Color": "Text", "MTGJSONID": "Text"}, ["Color", "MTGJSONID"])
+
+
+def getCardColorsTableStructure():
+    return ("tblCardColors", {"Color": "Text", "MTGJSONID": "Text"}, ["Color", "MTGJSONID"])
+
+
+def getCardTypeTableStructure():
+    return ("tblCardType", {"MTGJSONID": "Text", "CardType": "Text"}, ["MTGJSONID", "CardType"])
+
+
+def getCardVariationsTableStructure():
+    return ("tblCardVariations", {"MTGJSONID": "Text", "MTGJSONIDVariation": "Text"}, ["MTGJSONID", "MTGJSONIDVariation"])
+
+
+def getCardsTableStructure():
+    return None
+
+
+def getLegalFormatTableStructure():
+    return None
+
+
+def getSetsTableStructure():
+    return None
+
+
+def getSetsCardsTableStructure():
+    return None
+
+
+def getSetsTokensTableStructure():
+    return None
+
+
+def getSubTypesTableStructure():
+    return None
+
+
+def getSuperTypesTableStructure():
+    return None
+
+
+def getTableStructure():
+    return None
 
 
 def insertIntoSetsTable(databaseConnection, JSONDictionary):

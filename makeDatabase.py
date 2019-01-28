@@ -94,35 +94,33 @@ def getCardVariationsTableStructure():
 
 
 def getCardsTableStructure():
-    return None
+    return ("tblCards", {"Artist": "TEXT", "BorderColor": "TEXT", "ConvertedManaCost": "REAL", "DuelDeck": "TEXT", "ConvertedManaCostFace": "REAL", "FlavorText": "TEXT", "FrameEffect": "TEXT", "FrameVersion": "TEXT", "HasFoil": "TEXT", "HasNonFoil": "TEXT", "IsAlternative": "TEXT", "IsFoilOnly": "TEXT", "IsOnlineOnly": "TEXT", "IsOversized": "TEXT", "IsReserved": "TEXT", "IsTimeShifted": "TEXT", "Layout": "TEXT", "Loyalty": "TEXT", "ManaCost": "TEXT", "MultiverseID": "INTEGER", "Name": "TEXT", "NamesArray": "Text", "Number": "TEXT", "OriginalText": "TEXT", "OriginalType": "TEXT", "Power": "TEXT", "Rarity": "TEXT", "ScryFallID": "TEXT", "Side": "TEXT", "Starter": "TEXT", "Text": "TEXT", "Toughness": "TEXT", "FullTypeText": "TEXT", "MTGJSONID": "TEXT", "Watermark": "Text"}, ["MTGJSONID"])
 
 
 def getLegalFormatTableStructure():
-    return None
+    return ("tblLegalFormat", {"MTGJSONID": "Text", "LegalFormat": "Text"}, ["MTGJSONID", "LegalFormat"])
 
 
 def getSetsTableStructure():
-    return None
+    return ("tblSets", {"Size": "INTEGER", "Block": "TEXT", "BoosterScheme": "TEXT", "Code": "TEXT", "IsOnlineOnly": "INTEGER", "MTGOCode": "TEXT", "Name": "TEXT", "ReleaseDate": "TEXT", "TotalSetSize": "INTEGER", "Type": "INTEGER"}, ["Code"])
 
 
 def getSetsCardsTableStructure():
-    return None
+    return ("tblSetsCards", {"Code": "TEXT", "MTGJSONID": "TEXT"}, ["Code", "MTGJSONID"])
 
 
 def getSetsTokensTableStructure():
-    return None
-
+    return ("tblSetsTokens",{"Code" :"TEXT", "MTGJSONID" :"TEXT"}, ["Code", "MTGJSONID"])
 
 def getSubTypesTableStructure():
-    return None
+    return ("tblSubTypes",{"MTGJSONID" :"TEXT", "SubType" :"TEXT"},["MTGJSONID", "SubType"])
 
 
 def getSuperTypesTableStructure():
-    return None
+    return ("tblSuperTypes",{"MTGJSONID" :"TEXT", "SuperType" :"TEXT"}, ["MTGJSONID", "SuperType"])
 
-
-def getTableStructure():
-    return None
+def getTokensTableStructure():
+    return ("tblTokens", {"Artist":"TEXT","BorderColor":"TEXT","Loyalty":"TEXT","Name":"TEXT","Number" : "TEXT","Original":"TEXT","OriginalType" : "TEXT","Power" : "TEXT","ScryFallID" : "TEXT","Side" : "TEXT","Starter" : "TEXT","Text":"TEXT","Toughness" : "TEXT","FullType":"TEXT","MTGJSONID" : "TEXT"},["MTGJSONID"])
 
 
 def insertIntoSetsTable(databaseConnection, JSONDictionary):

@@ -6,15 +6,18 @@ import traceback
 from collections import OrderedDict
 # retrieves a json file from the path provided
 
-
+#opens json file in utf-8 encoding
 def retrieveAllSetsJSON(path):
-    print("Opening the Vault!")
+    print("Opening the vault!")
     with open(path, "r", encoding="utf8") as mtg_json:
         pythonMtgSets = json.load(mtg_json)
+    print("Closing the vault!")
     return pythonMtgSets
 
 
-# Ensure the database is in the proper formatting
+# Ensure the database is sqlite compatible file and creates connection
+# Option to remove file.
+# NEEDS REVIEW FOR SAFER FILE HANDLING
 def createDatabaseConnection(filename, forcedOverride=False):
     # Forcibly override database. Good for refresh.
     if os.path.exists(filename) and forcedOverride:
@@ -26,9 +29,47 @@ def createDatabaseConnection(filename, forcedOverride=False):
         print("ERROR: Creating Connection")
 
         return None
-# General query function
 
+#Flexible create table function. 
+def createTable(databaseConnection, tableName, tableStructureDictionary, primaryKeyList):
+    try:
+        columnStatements=list()
+        for columnName, dataType in tableStructureDictionary.items():
+            columnStatements.append(columnName+" "+dataType)
+        
+        if len(primaryKeyList)==0 or primaryKeyList is None:
+            primaryKeyStatement=""
+        else:
+            primaryKeyStatement=",Primary Key("+",".join(primaryKeyList)+")"
 
+        createStatement="Create Table "+ tableName +"("+",".join(columnStatements)+primaryKeyStatement+");"
+
+        databaseConnection.execute(createStatement)
+        databaseConnection.commit()
+    # Rolls back database changes if errors are encountered
+    except sqlite3.Error:
+        print("ERROR: Create statement failed for table " +
+              tableName+". Performing Rollback")
+        databaseConnection.rollback()
+        raise
+
+#single insert into table statement
+def insertIntoTableSingle(databaseConnection, columnRowTuple, tableName):
+    try:
+        insertStatement = "Insert into "+tableName+"(\"" + "\",\"".join(
+            columnRowTuple[0]) + "\") values(\"" + ",".join(["?"]*len(columnRowTuple[0]))+"\");"
+
+        
+        databaseConnection.execute(insertStatement, columnRowTuple[1])
+        databaseConnection.commit()
+    # Rolls back database changes if errors are encountered
+    except sqlite3.Error:
+        print("ERROR: Insert statements failed for table " +
+              tableName+". Performing Rollback")
+        databaseConnection.rollback()
+        raise
+
+#Bulk insert into table statement
 def insertIntoTableBulk(databaseConnection, columnRowsTuple, tableName):
     try:
         insertStatement = "Insert into "+tableName+"(\"" + "\",\"".join(
@@ -44,25 +85,9 @@ def insertIntoTableBulk(databaseConnection, columnRowsTuple, tableName):
         databaseConnection.rollback()
         raise
 
-
-def insertIntoTableSingle(databaseConnection, columnRowTuple, tableName):
-    try:
-        insertStatement = "Insert into "+tableName+"(\"" + "\",\"".join(
-            columnRowTuple[0]) + "\") values(\"" + ",".join(["?"]*len(columnRowTuple[0]))+"\");"
-
-        # Attempts insert statement
-        databaseConnection.execute(insertStatement, columnRowTuple[1])
-        databaseConnection.commit()
-    # Rolls back database changes if errors are encountered
-    except sqlite3.Error:
-        print("ERROR: Insert statements failed for table " +
-              tableName+". Performing Rollback")
-        databaseConnection.rollback()
-        raise
-
-
-
-def normalizeIrregularValues(rowDictionary, columnsList):
+# Assign default values to column row values that are empty
+# If value is not present, it generally is not included in json file
+def normalizeEmptyValues(rowDictionary, columnsList):
     for i in columnsList:
         if i in rowDictionary:
             if rowDictionary[i] is None:
@@ -70,35 +95,10 @@ def normalizeIrregularValues(rowDictionary, columnsList):
         else:
             rowDictionary[i] = 'n/a'
 
-def createTable(databaseConnection, tableName, tableStructureDictionary, primaryKeyList):
-    try:
-        columnStatements=list()
-        for columnName, dataType in tableStructureDictionary.items():
-            columnStatements.append(columnName+" "+dataType)
-        
-        if len(primaryKeyList)==0 or primaryKeyList is None:
-            primaryKeyStatement=""
-        else:
-            primaryKeyStatement=",Primary Key("+",".join(primaryKeyList)+")"
-
-        createStatement="Create Table "+ tableName +"("+",".join(columnStatements)+primaryKeyStatement+");"
-
-        # Attempts insert statement
-        databaseConnection.execute(createStatement)
-        databaseConnection.commit()
-    # Rolls back database changes if errors are encountered
-    except sqlite3.Error:
-        print("ERROR: Create statement failed for table " +
-              tableName+". Performing Rollback")
-        databaseConnection.rollback()
-        raise
-# Driver function to load data into tables
-def loadJSONDataIntoTables(dbConnection, jsonFile):
-    return None
-
-# returns tuple of table name, sqllite meta structure as dictionary and primary keys as lists
-
-
+# Represents individual components of each table.
+# Get statement will return a tuple of table name, 
+# sqllite columnname/dataype structure as dictionary and 
+# primary keys as a list of column names
 def getCardColorIdentityTableStructure():
     return ("tblCardColorIdentity", {"Color": "Text", "MTGJSONID": "Text"}, ["Color", "MTGJSONID"])
 
@@ -144,10 +144,10 @@ def getSuperTypesTableStructure():
 def getTokensTableStructure():
     return ("tblTokens", {"Artist":"TEXT","BorderColor":"TEXT","Loyalty":"TEXT","Name":"TEXT","Number" : "TEXT","Original":"TEXT","OriginalType" : "TEXT","Power" : "TEXT","ScryFallID" : "TEXT","Side" : "TEXT","Starter" : "TEXT","Text":"TEXT","Toughness" : "TEXT","FullType":"TEXT","MTGJSONID" : "TEXT"},["MTGJSONID"])
 
-
-def createDatabaseTables(databaseConnection):
-    #returnTuple=getCardColorIdentityTableStructure()
-    #createTable(databaseConnection, returnTuple[0], returnTuple[1], returnTuple[2])
+#Calls and passes all get statements to create table function 
+# to freshly build all tables.
+def createAllDatabaseTables(databaseConnection):
+    print("Creating all tables")
     createTable(databaseConnection, *getCardColorIdentityTableStructure())
     createTable(databaseConnection, *getCardColorsTableStructure())
     createTable(databaseConnection, *getCardTypeTableStructure())
@@ -161,34 +161,56 @@ def createDatabaseTables(databaseConnection):
     createTable(databaseConnection, *getSuperTypesTableStructure())
     createTable(databaseConnection, *getTokensTableStructure())
 
+# Driver function to load data into tables
+#mtgJsonFile will be a dictionary of a set's abreviated name
+#as the key, with the values being a dictionary representing
+#the different aspects of a set.
+def parseMtgJsonIntoTables(dbConnection, mtgJsonFile):
+    #load table structure information
+    cardColorIdentityTableStructure= getCardColorIdentityTableStructure()
+    cardColorsTableStructure= getCardColorsTableStructure()
+    cardTypeTableStructure=getCardTypeTableStructure()
+    cardVariationsTableStructure=getCardVariationsTableStructure()
+    cardsTableStructure=getCardsTableStructure()
+    legalFormatTableStructure=getLegalFormatTableStructure()
+    setsTableStructure=getSetsTableStructure()
+    setsCardsTableStructure= getSetsCardsTableStructure()
+    setsTokensTableStructure=getSetsTokensTableStructure()
+    subTypesTableStructure=getSubTypesTableStructure()
+    superTypesTableStructure=getSuperTypesTableStructure()
+    tokensTableStructure=getTokensTableStructure()
+
+    print("Loading the tables")
+
+    #for allSetInformation in mtgJsonFile.values():
+        #for setInformationLabel, setInformationValue in allSetInformation.items():
+            #Insert into sets table
+
+
+
+
+
 def main():
     if len(sys.argv) < 3:
         print(
             "Usage: %s <database path> <json path> [append current database]" % sys.argv[0])
         exit(1)
 
-    #jsonFile = retrieveAllSetsJSON(os.path.expanduser(sys.argv[2]))
     dbConnection = createDatabaseConnection(
         os.path.expanduser(sys.argv[1]), os.path.expanduser(sys.argv[3]))
-    if dbConnection is not None:
-        print("I Made a pretty database!!")
-        print(type(dbConnection))
 
     try:
         print("Creating Database.")
-        createDatabaseTables(dbConnection)
-        #loadJSONDataIntoTables(dbConnection, jsonFile)
+        createAllDatabaseTables(dbConnection)
+        parseMtgJsonIntoTables(dbConnection, retrieveAllSetsJSON(os.path.expanduser(sys.argv[2])))
     except:
         print("ERROR: Something Broke. This is the main function.")
-        # exc_type, exc_obj, exc_tb = sys.exc_info()
-        # fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-        # print(exc_type, fname, exc_tb.tb_lineno)
         traceback.print_exc()
         exit("General Error")
 
     if dbConnection is not None:
         dbConnection.close()
-        print("We closed the database!")
+        print("The database is done building.")
 
 
 if __name__ == '__main__':

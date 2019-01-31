@@ -54,13 +54,16 @@ def createTable(databaseConnection, tableName, tableStructureDictionary, primary
         raise
 
 #single insert into table statement
-def insertIntoTableSingle(databaseConnection, columnRowTuple, tableName):
+def insertIntoTableSingle(databaseConnection, rowDictionary, tableName):
+    #break apart dictionary
+    rowColumns=[column for column in rowDictionary.keys()] 
+    rowValues=[rowDictionary[values] for values in rowColumns]
     try:
         insertStatement = "Insert into "+tableName+"(\"" + "\",\"".join(
-            columnRowTuple[0]) + "\") values(\"" + ",".join(["?"]*len(columnRowTuple[0]))+"\");"
+            rowColumns) + "\") values(\"" + ",".join(["?"]*len(rowColumns))+"\");"
 
         
-        databaseConnection.execute(insertStatement, columnRowTuple[1])
+        databaseConnection.execute(insertStatement, rowValues)
         databaseConnection.commit()
     # Rolls back database changes if errors are encountered
     except sqlite3.Error:
@@ -174,17 +177,26 @@ def parseMtgJsonIntoTables(dbConnection, mtgJsonFile):
     cardsTableStructure=getCardsTableStructure()
     legalFormatTableStructure=getLegalFormatTableStructure()
     setsTableStructure=getSetsTableStructure()
-    setsCardsTableStructure= getSetsCardsTableStructure()
+    setsCardsTableStructure=getSetsCardsTableStructure()
     setsTokensTableStructure=getSetsTokensTableStructure()
     subTypesTableStructure=getSubTypesTableStructure()
     superTypesTableStructure=getSuperTypesTableStructure()
     tokensTableStructure=getTokensTableStructure()
 
     print("Loading the tables")
+    toggle=1
+    for allSetInformation in mtgJsonFile.values():
+        for setInformation in allSetInformation:
+            #clean and insert into set table
+            #normalizeEmptyValues(rowDictionary, columnsList)
+            if toggle:
+                print(setInformation)
+                print(setsTableStructure[1].keys())
+                toggle=0
+            #normalizeEmptyValues(setInformation, setsTableStructure[1].keys())
+            #insertIntoTableSingle(dbConnection, setsTableStructure[1], setsTableStructure[0])
 
-    #for allSetInformation in mtgJsonFile.values():
-        #for setInformationLabel, setInformationValue in allSetInformation.items():
-            #Insert into sets table
+            
 
 
 
@@ -196,8 +208,7 @@ def main():
             "Usage: %s <database path> <json path> [append current database]" % sys.argv[0])
         exit(1)
 
-    dbConnection = createDatabaseConnection(
-        os.path.expanduser(sys.argv[1]), os.path.expanduser(sys.argv[3]))
+    dbConnection = createDatabaseConnection(os.path.expanduser(sys.argv[1]), os.path.expanduser(sys.argv[3]))
 
     try:
         print("Creating Database.")

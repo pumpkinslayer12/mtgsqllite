@@ -190,6 +190,7 @@ def parseMtgJsonIntoTables(dbConnection, mtgJsonFile):
             #clean and insert into set table
             #normalizeEmptyValues(rowDictionary, columnsList)
             if toggle:
+                print(allSetInformation)
                 print(setInformation)
                 print(setsTableStructure[1].keys())
                 toggle=0

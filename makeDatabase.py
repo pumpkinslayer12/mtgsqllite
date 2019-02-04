@@ -56,14 +56,13 @@ def createTable(databaseConnection, tableName, tableStructureDictionary, primary
 #single insert into table statement
 def insertIntoTableSingle(databaseConnection, rowDictionary, tableName):
     #break apart dictionary
-    rowColumns=[column for column in rowDictionary.keys()] 
-    rowValues=[rowDictionary[values] for values in rowColumns]
+    rowColumns=[str(column) for column in rowDictionary.keys()]
+    rowValues=[str(rowDictionary[values]) for values in rowColumns]
     try:
         insertStatement = "Insert into "+tableName+"(\"" + "\",\"".join(
-            rowColumns) + "\") values(\"" + ",".join(["?"]*len(rowColumns))+"\");"
+            rowColumns) + "\") values(\"" + "\",\"".join(rowValues)+"\");"
 
-        
-        databaseConnection.execute(insertStatement, rowValues)
+        databaseConnection.execute(insertStatement)
         databaseConnection.commit()
     # Rolls back database changes if errors are encountered
     except sqlite3.Error:
@@ -90,32 +89,39 @@ def insertIntoTableBulk(databaseConnection, columnRowsTuple, tableName):
 
 # Assign default values to column row values that are empty
 # If value is not present, it generally is not included in json file
-def normalizeEmptyValues(rowDictionary, columnsList):
-    for i in columnsList:
-        if i in rowDictionary:
-            if rowDictionary[i] is None:
-                rowDictionary[i] = 'n/a'
+def getCleanDictionary(rowDictionary, columnsList):
+    #build references to row values needed
+    #print(rowDictionary.keys())
+    #print(columnsList)
+    cleanDictionary=dict()
+    for column in columnsList:
+        if column in rowDictionary: 
+            
+            cleanDictionary[column]=rowDictionary[column]
+            if cleanDictionary[column] is None:
+                cleanDictionary[column]='n/a'
         else:
-            rowDictionary[i] = 'n/a'
+            cleanDictionary[column]='n/a'
+    return cleanDictionary
 
 # Represents individual components of each table.
 # Get statement will return a tuple of table name, 
 # sqllite columnname/dataype structure as dictionary and 
 # primary keys as a list of column names
 def getCardColorIdentityTableStructure():
-    return ("tblCardColorIdentity", {"Color": "Text", "MTGJSONID": "Text"}, ["Color", "MTGJSONID"])
+    return ("tblCardColorIdentity", {"color": "Text", "mtgJsonID": "Text"}, ["Color", "mtgJsonID"])
 
 
 def getCardColorsTableStructure():
-    return ("tblCardColors", {"Color": "Text", "MTGJSONID": "Text"}, ["Color", "MTGJSONID"])
+    return ("tblCardColors", {"Color": "Text", "mtgJsonID": "Text"}, ["Color", "mtgJsonID"])
 
 
 def getCardTypeTableStructure():
-    return ("tblCardType", {"MTGJSONID": "Text", "CardType": "Text"}, ["MTGJSONID", "CardType"])
+    return ("tblCardType", {"MTGJSONID": "Text", "CardType": "Text"}, ["mtgJsonID", "CardType"])
 
 
 def getCardVariationsTableStructure():
-    return ("tblCardVariations", {"MTGJSONID": "Text", "MTGJSONIDVariation": "Text"}, ["MTGJSONID", "MTGJSONIDVariation"])
+    return ("tblCardVariations", {"mtgJsonID": "Text", "mtgJsonIDVariation": "Text"}, ["mtgJsonID", "mtgJsonIDVariation"])
 
 
 def getCardsTableStructure():
@@ -127,15 +133,15 @@ def getLegalFormatTableStructure():
 
 
 def getSetsTableStructure():
-    return ("tblSets", {"Size": "INTEGER", "Block": "TEXT", "BoosterScheme": "TEXT", "Code": "TEXT", "IsOnlineOnly": "INTEGER", "MTGOCode": "TEXT", "Name": "TEXT", "ReleaseDate": "TEXT", "TotalSetSize": "INTEGER", "Type": "INTEGER"}, ["Code"])
+    return ("tblSets", {"baseSetSize": "INTEGER", "block": "TEXT", "code": "TEXT", "isOnlineOnly": "INTEGER", "mtgoCode": "TEXT", "name": "TEXT", "releaseDate": "TEXT", "totalSetSize": "INTEGER", "type": "INTEGER"}, ["code"])
 
 
 def getSetsCardsTableStructure():
-    return ("tblSetsCards", {"Code": "TEXT", "MTGJSONID": "TEXT"}, ["Code", "MTGJSONID"])
+    return ("tblSetsCards", {"code": "TEXT", "MTGJSONID": "TEXT"}, ["code", "MTGJSONID"])
 
 
 def getSetsTokensTableStructure():
-    return ("tblSetsTokens",{"Code" :"TEXT", "MTGJSONID" :"TEXT"}, ["Code", "MTGJSONID"])
+    return ("tblSetsTokens",{"code" :"TEXT", "MTGJSONID" :"TEXT"}, ["code", "MTGJSONID"])
 
 def getSubTypesTableStructure():
     return ("tblSubTypes",{"MTGJSONID" :"TEXT", "SubType" :"TEXT"},["MTGJSONID", "SubType"])
@@ -184,24 +190,16 @@ def parseMtgJsonIntoTables(dbConnection, mtgJsonFile):
     tokensTableStructure=getTokensTableStructure()
 
     print("Loading the tables")
-    toggle=1
-    for allSetInformation in mtgJsonFile.values():
-        for setInformation in allSetInformation:
-            #clean and insert into set table
-            #normalizeEmptyValues(rowDictionary, columnsList)
-            if toggle:
-                print(allSetInformation)
-                print(setInformation)
-                print(setsTableStructure[1].keys())
-                toggle=0
-            #normalizeEmptyValues(setInformation, setsTableStructure[1].keys())
-            #insertIntoTableSingle(dbConnection, setsTableStructure[1], setsTableStructure[0])
-
-            
-
-
-
-
+    for setInformation in mtgJsonFile.values():
+        #print("prenormalize: "+str(setInformation.keys()))
+        #insert set information 
+        #getCleanDictionary(setInformation, setsTableStructure[1].keys())
+        #requiredFields= {x:y for (x,y) in setInformation.items() if x in setsTableStructure[1]} 
+        insertIntoTableSingle(dbConnection,
+        getCleanDictionary(setInformation, setsTableStructure[1].keys()),
+        setsTableStructure[0])
+        #print("post-normalize: "+str(setInformation.keys()))
+        #print("Required fields: "+str(requiredFields.keys()))
 
 def main():
     if len(sys.argv) < 3:

@@ -3,7 +3,6 @@ import sqlite3
 import os
 import sys
 import traceback
-from collections import OrderedDict
 # retrieves a json file from the path provided
 
 #opens json file in utf-8 encoding
@@ -32,6 +31,7 @@ def createDatabaseConnection(filename, forcedOverride=False):
 
 #Flexible create table function. 
 def createTable(databaseConnection, tableName, tableStructureDictionary, primaryKeyList):
+    createStatement=""
     try:
         columnStatements=list()
         for columnName, dataType in tableStructureDictionary.items():
@@ -43,24 +43,26 @@ def createTable(databaseConnection, tableName, tableStructureDictionary, primary
             primaryKeyStatement=",Primary Key("+",".join(primaryKeyList)+")"
 
         createStatement="Create Table "+ tableName +"("+",".join(columnStatements)+primaryKeyStatement+");"
-
+        #createStatement="Create Table "+ tableName +"("+",".join(columnStatements)+");"
         databaseConnection.execute(createStatement)
         databaseConnection.commit()
     # Rolls back database changes if errors are encountered
     except sqlite3.Error:
         print("ERROR: Create statement failed for table " +
               tableName+". Performing Rollback")
+        print(createStatement)
         databaseConnection.rollback()
         raise
 
 #single insert into table statement
 def insertIntoTableSingle(databaseConnection, rowDictionary, tableName):
+    insertStatement=""
     #break apart dictionary
     rowColumns=[str(column) for column in rowDictionary.keys()]
     rowValues=[str(rowDictionary[values]) for values in rowColumns]
     try:
-        insertStatement = "Insert into "+tableName+"(\"" + "\",\"".join(
-            rowColumns) + "\") values(\"" + "\",\"".join(rowValues)+"\");"
+        insertStatement = "Insert into "+tableName+"(\"" + "\" , \"".join(
+            rowColumns) + "\") values(\"" + "\" , \"".join(rowValues)+"\");"
 
         databaseConnection.execute(insertStatement)
         databaseConnection.commit()
@@ -68,22 +70,26 @@ def insertIntoTableSingle(databaseConnection, rowDictionary, tableName):
     except sqlite3.Error:
         print("ERROR: Insert statements failed for table " +
               tableName+". Performing Rollback")
+        print(insertStatement)
         databaseConnection.rollback()
         raise
 
-#Bulk insert into table statement
-def insertIntoTableBulk(databaseConnection, columnRowsTuple, tableName):
+#single insert into table statement
+def insertIntoTableMany(databaseConnection, columnHeadings, rowValues, tableName):
+    insertStatement=""
+    #break apart dictionary
     try:
-        insertStatement = "Insert into "+tableName+"(\"" + "\",\"".join(
-            columnRowsTuple[0]) + "\") values(\"" + ",".join(["?"]*len(columnRowsTuple[0]))+"\");"
-
-        # Attempts insert statement
-        databaseConnection.executemany(insertStatement, columnRowsTuple[1])
+        insertStatement = "Insert into "+tableName+"(\"" + "\" , \"".join(
+            columnHeadings) + "\") values("+" , ".join(["?"]*len(columnHeadings))+");"
+        databaseConnection.executemany(insertStatement,set(rowValues))
         databaseConnection.commit()
     # Rolls back database changes if errors are encountered
     except sqlite3.Error:
         print("ERROR: Insert statements failed for table " +
               tableName+". Performing Rollback")
+        print(insertStatement)
+        #print(len(rowValues))
+        #print(len(set(rowValues)))
         databaseConnection.rollback()
         raise
 
@@ -91,15 +97,14 @@ def insertIntoTableBulk(databaseConnection, columnRowsTuple, tableName):
 # If value is not present, it generally is not included in json file
 def getCleanDictionary(rowDictionary, columnsList):
     #build references to row values needed
-    #print(rowDictionary.keys())
-    #print(columnsList)
     cleanDictionary=dict()
     for column in columnsList:
         if column in rowDictionary: 
             
-            cleanDictionary[column]=rowDictionary[column]
+            cleanDictionary[column]=str(rowDictionary[column]).replace('\n',' ').replace('\r',' ').replace("\"","")
             if cleanDictionary[column] is None:
                 cleanDictionary[column]='n/a'
+            
         else:
             cleanDictionary[column]='n/a'
     return cleanDictionary
@@ -109,27 +114,27 @@ def getCleanDictionary(rowDictionary, columnsList):
 # sqllite columnname/dataype structure as dictionary and 
 # primary keys as a list of column names
 def getCardColorIdentityTableStructure():
-    return ("tblCardColorIdentity", {"color": "Text", "mtgJsonID": "Text"}, ["Color", "mtgJsonID"])
+    return ("tblCardColorIdentity", {"color": "Text", "uuid": "Text"}, ["color", "uuid"])
 
 
 def getCardColorsTableStructure():
-    return ("tblCardColors", {"Color": "Text", "mtgJsonID": "Text"}, ["Color", "mtgJsonID"])
+    return ("tblCardColors", {"color": "Text", "uuid": "Text"}, ["color", "uuid"])
 
 
 def getCardTypeTableStructure():
-    return ("tblCardType", {"MTGJSONID": "Text", "CardType": "Text"}, ["mtgJsonID", "CardType"])
+    return ("tblCardType", {"uuid": "Text", "cardType": "Text"}, ["uuid", "cardType"])
 
 
 def getCardVariationsTableStructure():
-    return ("tblCardVariations", {"mtgJsonID": "Text", "mtgJsonIDVariation": "Text"}, ["mtgJsonID", "mtgJsonIDVariation"])
+    return ("tblCardVariations", {"uuid1": "Text", "uuid2": "Text"}, ["uuid1", "uuid2"])
 
 
 def getCardsTableStructure():
-    return ("tblCards", {"Artist": "TEXT", "BorderColor": "TEXT", "ConvertedManaCost": "REAL", "DuelDeck": "TEXT", "ConvertedManaCostFace": "REAL", "FlavorText": "TEXT", "FrameEffect": "TEXT", "FrameVersion": "TEXT", "HasFoil": "TEXT", "HasNonFoil": "TEXT", "IsAlternative": "TEXT", "IsFoilOnly": "TEXT", "IsOnlineOnly": "TEXT", "IsOversized": "TEXT", "IsReserved": "TEXT", "IsTimeShifted": "TEXT", "Layout": "TEXT", "Loyalty": "TEXT", "ManaCost": "TEXT", "MultiverseID": "INTEGER", "Name": "TEXT", "NamesArray": "Text", "Number": "TEXT", "OriginalText": "TEXT", "OriginalType": "TEXT", "Power": "TEXT", "Rarity": "TEXT", "ScryFallID": "TEXT", "Side": "TEXT", "Starter": "TEXT", "Text": "TEXT", "Toughness": "TEXT", "FullTypeText": "TEXT", "MTGJSONID": "TEXT", "Watermark": "Text"}, ["MTGJSONID"])
+    return ("tblCards", {"artist": "TEXT", "borderColor": "TEXT", "convertedManaCost": "REAL", "DuelDeck": "TEXT", "convertedManaCostFace": "REAL", "flavorText": "TEXT", "frameEffect": "TEXT", "frameVersion": "TEXT", "hasFoil": "TEXT", "hasNonFoil": "TEXT", "isAlternative": "TEXT", "isFoilOnly": "TEXT", "isOnlineOnly": "TEXT", "isOversized": "TEXT", "isReserved": "TEXT", "isTimeShifted": "TEXT", "layout": "TEXT", "loyalty": "TEXT", "manaCost": "TEXT", "multiverseID": "INTEGER", "name": "TEXT", "namesArray": "Text", "number": "TEXT", "originalText": "TEXT", "originalType": "TEXT", "power": "TEXT", "rarity": "TEXT", "scryFallID": "TEXT", "side": "TEXT", "starter": "TEXT", "text": "TEXT", "toughness": "TEXT", "fullTypeText": "TEXT", "uuid": "TEXT", "watermark": "Text"}, ["uuid"])
 
 
 def getLegalFormatTableStructure():
-    return ("tblLegalFormat", {"MTGJSONID": "Text", "LegalFormat": "Text"}, ["MTGJSONID", "LegalFormat"])
+    return ("tblLegalFormat", {"uuid": "Text", "LegalFormat": "Text"}, ["uuid", "LegalFormat"])
 
 
 def getSetsTableStructure():
@@ -137,22 +142,37 @@ def getSetsTableStructure():
 
 
 def getSetsCardsTableStructure():
-    return ("tblSetsCards", {"code": "TEXT", "MTGJSONID": "TEXT"}, ["code", "MTGJSONID"])
+    return ("tblSetsCards", {"code": "TEXT", "uuid": "TEXT"}, ["code", "uuid"])
 
 
 def getSetsTokensTableStructure():
-    return ("tblSetsTokens",{"code" :"TEXT", "MTGJSONID" :"TEXT"}, ["code", "MTGJSONID"])
+    return ("tblSetsTokens",{"code" :"TEXT", "uuid" :"TEXT"}, ["code", "uuid"])
 
 def getSubTypesTableStructure():
-    return ("tblSubTypes",{"MTGJSONID" :"TEXT", "SubType" :"TEXT"},["MTGJSONID", "SubType"])
+    return ("tblSubTypes",{"uuid" :"TEXT", "SubType" :"TEXT"},["uuid", "subType"])
 
 
 def getSuperTypesTableStructure():
-    return ("tblSuperTypes",{"MTGJSONID" :"TEXT", "SuperType" :"TEXT"}, ["MTGJSONID", "SuperType"])
+    return ("tblSuperTypes",{"uuid" :"TEXT", "superType" :"TEXT"}, ["uuid", "superType"])
 
 def getTokensTableStructure():
-    return ("tblTokens", {"Artist":"TEXT","BorderColor":"TEXT","Loyalty":"TEXT","Name":"TEXT","Number" : "TEXT","Original":"TEXT","OriginalType" : "TEXT","Power" : "TEXT","ScryFallID" : "TEXT","Side" : "TEXT","Starter" : "TEXT","Text":"TEXT","Toughness" : "TEXT","FullType":"TEXT","MTGJSONID" : "TEXT"},["MTGJSONID"])
+    return ("tblTokens", {"artist":"TEXT","borderColor":"TEXT","loyalty":"TEXT","name":"TEXT","number" : "TEXT","original":"TEXT","originalType" : "TEXT","power" : "TEXT","scryFallID" : "TEXT","side" : "TEXT","starter" : "TEXT","text":"TEXT","toughness" : "TEXT","fullType":"TEXT","uuid" : "TEXT"},["uuid"])
 
+def getAllTableColumns():
+    rawTables=[
+    getCardColorIdentityTableStructure(),
+    getCardColorsTableStructure(),
+    getCardTypeTableStructure(),
+    getCardVariationsTableStructure(),
+    getCardsTableStructure(),
+    getLegalFormatTableStructure(),
+    getSetsTableStructure(),
+    getSetsCardsTableStructure(),
+    getSetsTokensTableStructure(),
+    getSubTypesTableStructure(),
+    getSuperTypesTableStructure(),
+    getTokensTableStructure()]
+    return {i[0]:[str(j) for j in i[1].keys()] for i in rawTables}
 #Calls and passes all get statements to create table function 
 # to freshly build all tables.
 def createAllDatabaseTables(databaseConnection):
@@ -176,31 +196,69 @@ def createAllDatabaseTables(databaseConnection):
 #the different aspects of a set.
 def parseMtgJsonIntoTables(dbConnection, mtgJsonFile):
     #load table structure information
-    cardColorIdentityTableStructure= getCardColorIdentityTableStructure()
-    cardColorsTableStructure= getCardColorsTableStructure()
-    cardTypeTableStructure=getCardTypeTableStructure()
-    cardVariationsTableStructure=getCardVariationsTableStructure()
-    cardsTableStructure=getCardsTableStructure()
-    legalFormatTableStructure=getLegalFormatTableStructure()
-    setsTableStructure=getSetsTableStructure()
-    setsCardsTableStructure=getSetsCardsTableStructure()
-    setsTokensTableStructure=getSetsTokensTableStructure()
-    subTypesTableStructure=getSubTypesTableStructure()
-    superTypesTableStructure=getSuperTypesTableStructure()
-    tokensTableStructure=getTokensTableStructure()
+    allTableColumns=getAllTableColumns()
+    batchDictionary={i:[] for i in allTableColumns.keys()}
 
+    #Here because list objects are accessible in template, but not as raw numbers.
+    #Not sure why, but fixes scope issue.
+    emergency=[0]
+    #General template function used by all tables to append their values for batch insert
+    def appendTemplate(tblName, valuesDictionary):
+        cleanDictionary=getCleanDictionary(valuesDictionary, allTableColumns[tblName])
+        
+        if 'uuid' in cleanDictionary:
+            if cleanDictionary['uuid']=='n/a':
+                cleanDictionary['uuid']="FIX"+str(emergency[0])
+                emergency[0]+=1
+                
+        setValues=tuple(cleanDictionary[i] for i in allTableColumns[tblName])
+        batchDictionary[tblName].append(setValues)
+    
     print("Loading the tables")
-    for setInformation in mtgJsonFile.values():
-        #print("prenormalize: "+str(setInformation.keys()))
-        #insert set information 
-        #getCleanDictionary(setInformation, setsTableStructure[1].keys())
-        #requiredFields= {x:y for (x,y) in setInformation.items() if x in setsTableStructure[1]} 
-        insertIntoTableSingle(dbConnection,
-        getCleanDictionary(setInformation, setsTableStructure[1].keys()),
-        setsTableStructure[0])
-        #print("post-normalize: "+str(setInformation.keys()))
-        #print("Required fields: "+str(requiredFields.keys()))
+    for abrv, setInformation in mtgJsonFile.items():
+        
+        
+        appendTemplate('tblSets',setInformation)
 
+        for card in setInformation['cards']:
+            appendTemplate('tblCards',card)
+            appendTemplate('tblSetsCards',{'uuid':card['uuid'],'code':setInformation['code']})
+            
+            for color in card['colorIdentity']:
+                appendTemplate('tblCardColorIdentity',{'uuid':card['uuid'],'color':color})
+
+            for color in card['colors']:
+                appendTemplate('tblCardColors',{'uuid':card['uuid'],'color':color})
+
+            
+                appendTemplate('tblCardColorIdentity',{'uuid':card['uuid'],'color':color})
+            
+            for cardType in card['types']:
+                if 'uuid' in card: 
+                    appendTemplate('tblCardType',{'uuid':card['uuid'],'cardType':cardType})
+                else:
+                    appendTemplate('tblCardType',{'uuid':"n/a",'cardType':cardType})
+            
+            for variationID in card['variations']:
+                if 'uuid' in card: 
+                    appendTemplate('tblCardType',{'uuid':card['uuid'],'cardType':cardType})
+                else:
+                    appendTemplate('tblCardType',{'uuid':"n/a",'cardType':cardType})
+        
+        for token in setInformation['tokens']:
+           
+            
+            appendTemplate('tblTokens',token)
+            if 'uuid' in token:
+                appendTemplate('tblSetsTokens',{'uuid':token['uuid'],'code':setInformation['code']})
+            else:
+                appendTemplate('tblSetsTokens',{'uuid':"n/a",'code':setInformation['code']})
+            
+    for tableName, values in batchDictionary.items():
+        if len(values)>0:
+            insertIntoTableMany(dbConnection, allTableColumns[tableName], values, tableName)
+        
+        
 def main():
     if len(sys.argv) < 3:
         print(
@@ -214,7 +272,6 @@ def main():
         createAllDatabaseTables(dbConnection)
         parseMtgJsonIntoTables(dbConnection, retrieveAllSetsJSON(os.path.expanduser(sys.argv[2])))
     except:
-        print("ERROR: Something Broke. This is the main function.")
         traceback.print_exc()
         exit("General Error")
 

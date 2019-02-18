@@ -134,7 +134,7 @@ def getCardsTableStructure():
 
 
 def getLegalFormatTableStructure():
-    return ("tblLegalFormat", {"uuid": "Text", "LegalFormat": "Text"}, ["uuid", "LegalFormat"])
+    return ("tblLegalFormat", {"uuid": "Text", "format": "Text", "legalStatus":"Text"}, ["uuid", "format"])
 
 
 def getSetsTableStructure():
@@ -149,14 +149,15 @@ def getSetsTokensTableStructure():
     return ("tblSetsTokens",{"code" :"TEXT", "uuid" :"TEXT"}, ["code", "uuid"])
 
 def getSubTypesTableStructure():
-    return ("tblSubTypes",{"uuid" :"TEXT", "SubType" :"TEXT"},["uuid", "subType"])
+    return ("tblSubtypes",{"uuid" :"TEXT", "subtype" :"TEXT"},["uuid", "subtype"])
 
 
 def getSuperTypesTableStructure():
-    return ("tblSuperTypes",{"uuid" :"TEXT", "superType" :"TEXT"}, ["uuid", "superType"])
+    return ("tblSupertypes",{"uuid" :"TEXT", "supertype" :"TEXT"}, ["uuid", "supertype"])
 
+#There is a primary key issue.
 def getTokensTableStructure():
-    return ("tblTokens", {"artist":"TEXT","borderColor":"TEXT","loyalty":"TEXT","name":"TEXT","number" : "TEXT","original":"TEXT","originalType" : "TEXT","power" : "TEXT","scryFallID" : "TEXT","side" : "TEXT","starter" : "TEXT","text":"TEXT","toughness" : "TEXT","fullType":"TEXT","uuid" : "TEXT"},["uuid"])
+    return ("tblTokens", {"artist":"TEXT","borderColor":"TEXT","loyalty":"TEXT","name":"TEXT","number" : "TEXT","original":"TEXT","originalType" : "TEXT","power" : "TEXT","scryFallID" : "TEXT","side" : "TEXT","starter" : "TEXT","text":"TEXT","toughness" : "TEXT","fullType":"TEXT","uuid" : "TEXT"},[])
 
 def getAllTableColumns():
     rawTables=[
@@ -198,61 +199,81 @@ def parseMtgJsonIntoTables(dbConnection, mtgJsonFile):
     #load table structure information
     allTableColumns=getAllTableColumns()
     batchDictionary={i:[] for i in allTableColumns.keys()}
-
     #Here because list objects are accessible in template, but not as raw numbers.
     #Not sure why, but fixes scope issue.
     emergency=[0]
+
+    def getEmergencyID(lastBoolean=0):
+        if lastBoolean:
+            return "FIXME"+ str(emergency[0])
+        else:
+            emergency[0]+=1
+            return "FIXME"+ str(emergency[0])
+    
+
     #General template function used by all tables to append their values for batch insert
     def appendTemplate(tblName, valuesDictionary):
         cleanDictionary=getCleanDictionary(valuesDictionary, allTableColumns[tblName])
-        
-        if 'uuid' in cleanDictionary:
-            if cleanDictionary['uuid']=='n/a':
-                cleanDictionary['uuid']="FIX"+str(emergency[0])
-                emergency[0]+=1
                 
         setValues=tuple(cleanDictionary[i] for i in allTableColumns[tblName])
         batchDictionary[tblName].append(setValues)
     
     print("Loading the tables")
-    for abrv, setInformation in mtgJsonFile.items():
+    for setInformation in mtgJsonFile.values():
         
         
         appendTemplate('tblSets',setInformation)
 
+        
         for card in setInformation['cards']:
-            appendTemplate('tblCards',card)
-            appendTemplate('tblSetsCards',{'uuid':card['uuid'],'code':setInformation['code']})
+            
+            if 'uuid' not in card:
+                uuidBuffer=getEmergencyID(0)
+            else:
+                uuidBuffer=card['uuid']
+                
+            #cannot add uuid mid-iteration
+            cardBuffer=dict(card)
+            cardBuffer['uuid']=uuidBuffer
+            appendTemplate('tblCards',cardBuffer)
+
+            appendTemplate('tblSetsCards',{'uuid':uuidBuffer,'code':setInformation['code']})
             
             for color in card['colorIdentity']:
-                appendTemplate('tblCardColorIdentity',{'uuid':card['uuid'],'color':color})
+                appendTemplate('tblCardColorIdentity',{'uuid':uuidBuffer,'color':color})
 
             for color in card['colors']:
-                appendTemplate('tblCardColors',{'uuid':card['uuid'],'color':color})
-
-            
-                appendTemplate('tblCardColorIdentity',{'uuid':card['uuid'],'color':color})
+                appendTemplate('tblCardColors',{'uuid':uuidBuffer,'color':color})
             
             for cardType in card['types']:
-                if 'uuid' in card: 
-                    appendTemplate('tblCardType',{'uuid':card['uuid'],'cardType':cardType})
-                else:
-                    appendTemplate('tblCardType',{'uuid':"n/a",'cardType':cardType})
+                appendTemplate('tblCardType',{'uuid':uuidBuffer,'cardType':cardType})
+
+            if 'variations' in card:
+                for variationID in card['variations']:
+                    appendTemplate('tblCardVariations',{'uuid1':uuidBuffer,'uuid2':variationID})
+
+            for formatType,status in card['legalities'].items():
+                appendTemplate('tblLegalFormat',{'uuid':uuidBuffer, "format": formatType, "legalStatus":status})
+
+            for subtype in card['subtypes']:
+                appendTemplate('tblSubtypes',{'uuid': uuidBuffer,"subtype":subtype})
             
-            for variationID in card['variations']:
-                if 'uuid' in card: 
-                    appendTemplate('tblCardType',{'uuid':card['uuid'],'cardType':cardType})
-                else:
-                    appendTemplate('tblCardType',{'uuid':"n/a",'cardType':cardType})
-        
+            for supertype in card['supertypes']:
+                appendTemplate('tblSupertypes',{'uuid': uuidBuffer,"supertype":supertype})
+
         for token in setInformation['tokens']:
-           
-            
-            appendTemplate('tblTokens',token)
-            if 'uuid' in token:
-                appendTemplate('tblSetsTokens',{'uuid':token['uuid'],'code':setInformation['code']})
+            if 'uuid' not in token:
+                uuidBuffer=getEmergencyID(0)
             else:
-                appendTemplate('tblSetsTokens',{'uuid':"n/a",'code':setInformation['code']})
+                uuidBuffer=token['uuid']
+            #Get around readonly issue in token for loop
+            tokenBuffer=dict(token)
+            tokenBuffer['uuid']=uuidBuffer
+            
+
+            appendTemplate('tblTokens',tokenBuffer)
+
+            appendTemplate('tblSetsTokens',{'uuid':uuidBuffer,'code':setInformation['code']})
             
     for tableName, values in batchDictionary.items():
         if len(values)>0:
